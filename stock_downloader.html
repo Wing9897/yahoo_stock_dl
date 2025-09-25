@@ -1,0 +1,1305 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>股票數據爬取器 - 增強版 Web</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #2196F3;
+            --success-color: #4CAF50;
+            --warning-color: #FF9800;
+            --danger-color: #f44336;
+        }
+
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, var(--primary-color), #1976D2);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .navbar-brand {
+            color: white !important;
+            font-weight: bold;
+            font-size: 1.3rem;
+        }
+
+        .card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            transition: transform 0.2s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+        }
+
+        .form-control, .form-select {
+            border-radius: 8px;
+            border: 2px solid #e9ecef;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.2rem rgba(33, 150, 243, 0.25);
+        }
+
+        .btn {
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-color), #1976D2);
+            border: none;
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #1976D2, #1565C0);
+            transform: translateY(-1px);
+        }
+
+        .progress {
+            height: 8px;
+            border-radius: 4px;
+            background-color: #e9ecef;
+        }
+
+        .progress-bar {
+            background: linear-gradient(90deg, var(--success-color), #66BB6A);
+        }
+
+        .status-success {
+            color: var(--success-color);
+            font-weight: bold;
+        }
+
+        .status-error {
+            color: var(--danger-color);
+            font-weight: bold;
+        }
+
+        .status-warning {
+            color: var(--warning-color);
+            font-weight: bold;
+        }
+
+        .log-container {
+            background-color: #2d3748;
+            color: #e2e8f0;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .theme-toggle {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            border-radius: 20px;
+            padding: 5px 15px;
+            transition: all 0.3s ease;
+        }
+
+        .theme-toggle:hover {
+            background: rgba(255,255,255,0.3);
+            color: white;
+        }
+
+        .market-example {
+            font-style: italic;
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+
+        .interval-warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 6px;
+            padding: 8px;
+            font-size: 0.85rem;
+            color: #856404;
+        }
+
+        .result-table {
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .table th {
+            background-color: #f8f9fa;
+            border: none;
+            font-weight: 600;
+        }
+
+        .badge {
+            font-size: 0.8rem;
+            padding: 6px 12px;
+            border-radius: 20px;
+        }
+
+        [data-bs-theme="dark"] {
+            --bs-body-bg: #1a1a1a;
+            --bs-body-color: #ffffff;
+        }
+
+        [data-bs-theme="dark"] body {
+            background-color: #1a1a1a;
+        }
+
+        [data-bs-theme="dark"] .card {
+            background-color: #2d2d2d;
+            color: #ffffff;
+        }
+
+        [data-bs-theme="dark"] .form-control,
+        [data-bs-theme="dark"] .form-select {
+            background-color: #3d3d3d;
+            border-color: #555;
+            color: #ffffff;
+        }
+
+        [data-bs-theme="dark"] .table th {
+            background-color: #3d3d3d;
+            color: #ffffff;
+        }
+
+        [data-bs-theme="dark"] .interval-warning {
+            background-color: #3d2f00;
+            border-color: #665500;
+            color: #ffeb3b;
+        }
+    </style>
+</head>
+<body data-bs-theme="light">
+    <nav class="navbar navbar-expand-lg mb-4">
+        <div class="container">
+            <span class="navbar-brand">📈 股票數據爬取器 - 增強版</span>
+            <div class="navbar-nav ms-auto">
+                <div class="nav-item dropdown">
+                    <button class="btn theme-toggle dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        🌓 主題
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#" onclick="setTheme('auto')">🌓 自動（跟隨系統）</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="setTheme('light')">☀️ 淺色主題</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="setTheme('dark')">🌙 深色主題</a></li>
+                    </ul>
+                </div>
+                <button class="btn btn-outline-light ms-2" id="refresh-btn" type="button">🔄 重新整理</button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container pb-5">
+        <!-- 錯誤提示區域 -->
+        <div id="error-alert" class="alert alert-danger d-none" role="alert">
+            <ul id="error-list" class="mb-0"></ul>
+        </div>
+
+        <!-- 成功提示區域 -->
+        <div id="success-alert" class="alert alert-success d-none" role="alert">
+            <span id="success-message"></span>
+        </div>
+
+        <!-- 主要設定卡片 - 使用 Tab 組織 -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <h2 class="h4 mb-4">📋 股票數據爬取器設定</h2>
+                
+                <!-- Tab 導航 -->
+                <ul class="nav nav-tabs mb-4" id="settingsTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="basic-tab" data-bs-toggle="tab" data-bs-target="#basic-pane" type="button" role="tab">基本設置</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="advanced-tab" data-bs-toggle="tab" data-bs-target="#advanced-pane" type="button" role="tab">高級設置</button>
+                    </li>
+                </ul>
+
+                <!-- Tab 內容 -->
+                <div class="tab-content" id="settingsTabContent">
+                    <!-- 基本設置 Tab -->
+                    <div class="tab-pane fade show active" id="basic-pane" role="tabpanel">
+                        <form id="download-form" class="row g-4">
+                            <!-- 股票代號設置區域 -->
+                            <div class="col-12">
+                                <div class="card border-0 bg-light">
+                                    <div class="card-header bg-primary text-white">
+                                        <h6 class="mb-0">📊 股票代號設置</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-8">
+                                                <label for="symbols" class="form-label">股票代號</label>
+                                                <textarea class="form-control" id="symbols" name="symbols" rows="3" required 
+                                                    placeholder="輸入股票代號，多個用逗號分隔&#10;例如: AAPL, MSFT, GOOGL&#10;      2330.TW, 2317.TW">AAPL, MSFT, GOOGL</textarea>
+                                                <div id="validation-status" class="mt-2">
+                                                    <span class="badge bg-success">✅ 準備輸入股票代號</span>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="mb-3">
+                                                    <label for="market" class="form-label">市場</label>
+                                                    <select class="form-select" id="market" name="market">
+                                                        <option value="美國" data-suffix="" data-currency="USD" data-examples="AAPL, MSFT, GOOGL">美國 (USD)</option>
+                                                        <option value="台灣" data-suffix=".TW" data-currency="TWD" data-examples="2330.TW, 2317.TW">台灣 (TWD)</option>
+                                                        <option value="香港" data-suffix=".HK" data-currency="HKD" data-examples="0700.HK, 0005.HK">香港 (HKD)</option>
+                                                        <option value="日本" data-suffix=".T" data-currency="JPY" data-examples="7203.T, 6758.T">日本 (JPY)</option>
+                                                        <option value="德國" data-suffix=".DE" data-currency="EUR" data-examples="SAP.DE, VOW3.DE">德國 (EUR)</option>
+                                                        <option value="英國" data-suffix=".L" data-currency="GBP" data-examples="BARC.L, LLOY.L">英國 (GBP)</option>
+                                                    </select>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label for="interval" class="form-label">時間間隔</label>
+                                                    <select class="form-select" id="interval" name="interval">
+                                                        <option value="1m">1分鐘</option>
+                                                        <option value="2m">2分鐘</option>
+                                                        <option value="5m">5分鐘</option>
+                                                        <option value="15m">15分鐘</option>
+                                                        <option value="30m">30分鐘</option>
+                                                        <option value="60m">60分鐘</option>
+                                                        <option value="1h">1小時</option>
+                                                        <option value="1d" selected>1天</option>
+                                                        <option value="1wk">1週</option>
+                                                        <option value="1mo">1月</option>
+                                                    </select>
+                                                </div>
+                                                <div class="form-text market-example" id="market-example">
+                                                    範例：AAPL, MSFT, GOOGL
+                                                </div>
+                                                <div class="alert alert-warning mt-2 p-2" id="interval-warning">
+                                                    💡 提醒: 1分鐘數據僅限7天，分鐘級數據僅限60天，小時數據僅限730天
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 日期範圍和輸出設置 -->
+                            <div class="col-md-6">
+                                <div class="card border-0 bg-light">
+                                    <div class="card-header bg-info text-white">
+                                        <h6 class="mb-0">📅 日期範圍</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-6">
+                                                <label for="start_date" class="form-label">開始</label>
+                                                <input type="date" class="form-control" id="start_date" name="start_date" required>
+                                            </div>
+                                            <div class="col-6">
+                                                <label for="end_date" class="form-label">結束</label>
+                                                <input type="date" class="form-control" id="end_date" name="end_date" required>
+                                            </div>
+                                        </div>
+                                        <div class="mt-2">
+                                            <small class="text-muted">系統會自動驗證日期範圍是否符合 yfinance 限制</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="card border-0 bg-light">
+                                    <div class="card-header bg-success text-white">
+                                        <h6 class="mb-0">💾 輸出設置</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <label class="form-label">格式</label>
+                                        <div class="btn-group w-100 mb-3" role="group">
+                                            <input type="radio" class="btn-check" name="output_format" id="format-CSV" value="CSV" checked>
+                                            <label class="btn btn-outline-primary" for="format-CSV">CSV</label>
+                                            <input type="radio" class="btn-check" name="output_format" id="format-Excel" value="Excel">
+                                            <label class="btn btn-outline-primary" for="format-Excel">Excel</label>
+                                            <input type="radio" class="btn-check" name="output_format" id="format-SQLite" value="SQLite">
+                                            <label class="btn btn-outline-primary" for="format-SQLite">SQLite</label>
+                                        </div>
+                                        <div class="form-text">
+                                            <small>• CSV: 通用格式，易於處理<br>
+                                            • Excel: 適合數據分析<br>
+                                            • SQLite: 數據庫格式，支持查詢</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 控制按鈕 -->
+                            <div class="col-12">
+                                <div class="d-flex justify-content-end gap-2">
+                                    <button class="btn btn-outline-secondary" type="button" id="clear-btn">🧹 清空</button>
+                                    <button class="btn btn-primary px-4" type="submit" id="download-btn">
+                                        <span class="spinner-border spinner-border-sm d-none me-2" id="loading-spinner"></span>
+                                        🚀 開始下載
+                                    </button>
+                                    <button class="btn btn-danger" type="button" id="stop-btn" style="display: none;">⏹️ 停止</button>
+                                    <button class="btn btn-warning" type="button" id="retry-btn" style="display: none;">🔄 重試失敗</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- 高級設置 Tab -->
+                    <div class="tab-pane fade" id="advanced-pane" role="tabpanel">
+                        <div class="row g-4">
+                            <!-- 主題快速切換 -->
+                            <div class="col-12">
+                                <div class="card border-0 bg-light">
+                                    <div class="card-header bg-secondary text-white">
+                                        <h6 class="mb-0">🎨 主題快速切換</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="btn-group w-100" role="group">
+                                            <button type="button" class="btn btn-outline-primary" onclick="setTheme('auto')">🌓 自動</button>
+                                            <button type="button" class="btn btn-outline-primary" onclick="setTheme('light')">☀️ 淺色</button>
+                                            <button type="button" class="btn btn-outline-primary" onclick="setTheme('dark')">🌙 深色</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- yfinance 數據限制說明 -->
+                            <div class="col-12">
+                                <div class="card border-0 bg-light">
+                                    <div class="card-header bg-warning text-dark">
+                                        <h6 class="mb-0">📊 yfinance 數據限制說明</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <h6>時間間隔限制：</h6>
+                                                <ul class="list-unstyled">
+                                                    <li>• 1分鐘數據(1m)：僅限最近7天</li>
+                                                    <li>• 分鐘級數據(2m~30m)：僅限最近60天</li>
+                                                    <li>• 小時數據(1h)：僅限最近730天(約2年)</li>
+                                                    <li>• 日線及以上：可獲取長期歷史數據</li>
+                                                </ul>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <h6>⚠️ 重要提醒：</h6>
+                                                <ul class="list-unstyled">
+                                                    <li>• 數據成功率約98%（偶有失敗）</li>
+                                                    <li>• 僅限個人研究和教育用途</li>
+                                                    <li>• 數據可能延遲或缺失</li>
+                                                    <li>• 不建議用於實際交易決策</li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 其他功能說明 -->
+                            <div class="col-12">
+                                <div class="card border-0 bg-light">
+                                    <div class="card-header bg-info text-white">
+                                        <h6 class="mb-0">✨ 其他功能</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <ul class="list-unstyled">
+                                                    <li>• 智能股票代號驗證</li>
+                                                    <li>• 自動市場後綴添加</li>
+                                                    <li>• 智能日期範圍驗證</li>
+                                                    <li>• 實時下載進度顯示</li>
+                                                </ul>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <ul class="list-unstyled">
+                                                    <li>• 詳細下載日誌記錄</li>
+                                                    <li>• 失敗項目重試功能</li>
+                                                    <li>• 多種輸出格式支持</li>
+                                                    <li>• 響應式界面設計</li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 進度顯示區域 -->
+        <div class="card shadow-sm mb-4 d-none" id="progress-card">
+            <div class="card-body">
+                <h5 class="card-title">📊 下載進度</h5>
+                <div class="progress mb-3">
+                    <div class="progress-bar" id="progress-bar" role="progressbar" style="width: 0%"></div>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span id="progress-text">準備中...</span>
+                    <span id="progress-percent">0%</span>
+                </div>
+                <button class="btn btn-danger btn-sm mt-2" id="stop-btn" style="display: none;">⏹️ 停止下載</button>
+            </div>
+        </div>
+
+        <!-- 日誌顯示區域 -->
+        <div class="card shadow-sm mb-4 d-none" id="log-card">
+            <div class="card-body">
+                <h5 class="card-title">📝 下載日誌</h5>
+                <div class="log-container p-3" id="log-container">
+                    <div id="log-content"></div>
+                </div>
+                <button class="btn btn-outline-secondary btn-sm mt-2" id="clear-log-btn">清空日誌</button>
+            </div>
+        </div>
+
+        <!-- 結果顯示區域 -->
+        <div class="card shadow-sm d-none" id="results-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="card-title mb-0">📈 下載結果</h5>
+                    <div>
+                        <button class="btn btn-success me-2" id="download-all-btn">💾 下載全部</button>
+                        <button class="btn btn-outline-primary" id="retry-failed-btn">🔄 重試失敗</button>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <div class="h4 status-success" id="success-count">0</div>
+                            <small class="text-muted">成功</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <div class="h4 status-error" id="failed-count">0</div>
+                            <small class="text-muted">失敗</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <div class="h4 text-primary" id="total-count">0</div>
+                            <small class="text-muted">總計</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <div class="h4 text-info" id="total-records">0</div>
+                            <small class="text-muted">總記錄數</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover result-table">
+                        <thead>
+                            <tr>
+                                <th>股票代號</th>
+                                <th>狀態</th>
+                                <th>記錄數</th>
+                                <th>訊息</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="results-tbody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 全局變量
+        let downloadResults = [];
+        let isDownloading = false;
+        let downloadWorker = null;
+
+        // DOM 元素
+        const elements = {
+            form: document.getElementById('download-form'),
+            symbolsInput: document.getElementById('symbols'),
+            marketSelect: document.getElementById('market'),
+            intervalSelect: document.getElementById('interval'),
+            startDateInput: document.getElementById('start_date'),
+            endDateInput: document.getElementById('end_date'),
+            downloadBtn: document.getElementById('download-btn'),
+            clearBtn: document.getElementById('clear-btn'),
+            stopBtn: document.getElementById('stop-btn'),
+            retryBtn: document.getElementById('retry-btn'),
+            loadingSpinner: document.getElementById('loading-spinner'),
+            
+            errorAlert: document.getElementById('error-alert'),
+            errorList: document.getElementById('error-list'),
+            successAlert: document.getElementById('success-alert'),
+            successMessage: document.getElementById('success-message'),
+            
+            progressCard: document.getElementById('progress-card'),
+            progressBar: document.getElementById('progress-bar'),
+            progressText: document.getElementById('progress-text'),
+            progressPercent: document.getElementById('progress-percent'),
+            
+            logCard: document.getElementById('log-card'),
+            logContent: document.getElementById('log-content'),
+            clearLogBtn: document.getElementById('clear-log-btn'),
+            
+            resultsCard: document.getElementById('results-card'),
+            resultsTbody: document.getElementById('results-tbody'),
+            successCount: document.getElementById('success-count'),
+            failedCount: document.getElementById('failed-count'),
+            totalCount: document.getElementById('total-count'),
+            totalRecords: document.getElementById('total-records'),
+            downloadAllBtn: document.getElementById('download-all-btn'),
+            retryFailedBtn: document.getElementById('retry-failed-btn'),
+            
+            marketExample: document.getElementById('market-example'),
+            themeToggle: document.getElementById('theme-toggle')
+        };
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeDates();
+            setupEventListeners();
+            updateMarketExample();
+            updateIntervalWarning();
+            loadTheme();
+            loadSettings();
+        });
+
+        // 保存設置
+        function saveSettings() {
+            const settings = {
+                market: elements.marketSelect.value,
+                interval: elements.intervalSelect.value,
+                outputFormat: document.querySelector('input[name="output_format"]:checked').value,
+                startDate: elements.startDateInput.value,
+                endDate: elements.endDateInput.value
+            };
+            localStorage.setItem('stockDownloaderSettings', JSON.stringify(settings));
+        }
+
+        // 載入設置
+        function loadSettings() {
+            const savedSettings = localStorage.getItem('stockDownloaderSettings');
+            if (savedSettings) {
+                try {
+                    const settings = JSON.parse(savedSettings);
+                    
+                    if (settings.market) {
+                        elements.marketSelect.value = settings.market;
+                        updateMarketExample();
+                    }
+                    
+                    if (settings.interval) {
+                        elements.intervalSelect.value = settings.interval;
+                        updateIntervalWarning();
+                    }
+                    
+                    if (settings.outputFormat) {
+                        const formatRadio = document.querySelector(`input[name="output_format"][value="${settings.outputFormat}"]`);
+                        if (formatRadio) formatRadio.checked = true;
+                    }
+                    
+                    // 不自動載入日期，保持默認的一年範圍
+                } catch (e) {
+                    console.log('載入設置時發生錯誤:', e);
+                }
+            }
+        }
+
+        // 設置默認日期
+        function initializeDates() {
+            const today = new Date();
+            const oneYearAgo = new Date(today);
+            oneYearAgo.setFullYear(today.getFullYear() - 1);
+            
+            elements.startDateInput.value = oneYearAgo.toISOString().split('T')[0];
+            elements.endDateInput.value = today.toISOString().split('T')[0];
+        }
+
+        // 設置事件監聽器
+        function setupEventListeners() {
+            elements.form.addEventListener('submit', handleDownload);
+            elements.clearBtn.addEventListener('click', clearForm);
+            elements.stopBtn.addEventListener('click', stopDownload);
+            elements.clearLogBtn.addEventListener('click', clearLog);
+            elements.downloadAllBtn.addEventListener('click', downloadAllResults);
+            elements.retryFailedBtn.addEventListener('click', retryFailedDownloads);
+            elements.retryBtn.addEventListener('click', retryFailedDownloads);
+            elements.marketSelect.addEventListener('change', updateMarketExample);
+            elements.intervalSelect.addEventListener('change', updateIntervalWarning);
+            elements.symbolsInput.addEventListener('input', debounceValidation);
+            document.getElementById('refresh-btn').addEventListener('click', refreshData);
+            
+            // 日期變化監聽
+            elements.startDateInput.addEventListener('change', validateDateRange);
+            elements.endDateInput.addEventListener('change', validateDateRange);
+        }
+
+        // 更新市場示例
+        function updateMarketExample() {
+            const selectedOption = elements.marketSelect.selectedOptions[0];
+            const examples = selectedOption.dataset.examples;
+            elements.marketExample.textContent = `範例：${examples}`;
+            
+            // 重新驗證股票代號
+            validateStockSymbols();
+        }
+
+        // 更新時間間隔警告
+        function updateIntervalWarning() {
+            const interval = elements.intervalSelect.value;
+            const warningElement = document.getElementById('interval-warning');
+            
+            const warnings = {
+                '1m': '⚠️ 1分鐘數據：僅限最近7天',
+                '2m': '⚠️ 2分鐘數據：僅限最近60天',
+                '5m': '⚠️ 5分鐘數據：僅限最近60天',
+                '15m': '⚠️ 15分鐘數據：僅限最近60天',
+                '30m': '⚠️ 30分鐘數據：僅限最近60天',
+                '60m': '⚠️ 60分鐘數據：僅限最近60天',
+                '1h': '⚠️ 1小時數據：僅限最近730天(約2年)',
+                '1d': '💡 日線數據：可獲取長期歷史數據',
+                '1wk': '💡 週線數據：可獲取長期歷史數據',
+                '1mo': '💡 月線數據：可獲取長期歷史數據'
+            };
+            
+            warningElement.textContent = warnings[interval] || '💡 提醒: 請注意數據時間限制';
+            
+            // 根據間隔類型設置不同顏色
+            if (['1m', '2m', '5m', '15m', '30m', '60m', '1h'].includes(interval)) {
+                warningElement.className = 'alert alert-warning mt-2 p-2';
+            } else {
+                warningElement.className = 'alert alert-info mt-2 p-2';
+            }
+            
+            // 驗證日期範圍
+            validateDateRange();
+        }
+
+        // 防抖驗證
+        let validationTimeout;
+        function debounceValidation() {
+            clearTimeout(validationTimeout);
+            validationTimeout = setTimeout(validateStockSymbols, 1000);
+        }
+
+        // 驗證股票代號
+        function validateStockSymbols() {
+            const symbols = elements.symbolsInput.value.trim();
+            const validationStatus = document.getElementById('validation-status');
+            
+            if (!symbols) {
+                validationStatus.innerHTML = '<span class="badge bg-secondary">✅ 準備輸入股票代號</span>';
+                return;
+            }
+            
+            const symbolList = symbols.split(/[,\n\r]+/).map(s => s.trim().toUpperCase()).filter(s => s.length > 0);
+            
+            if (symbolList.length === 0) {
+                validationStatus.innerHTML = '<span class="badge bg-warning">⚠️ 請輸入有效的股票代號</span>';
+                return;
+            }
+            
+            // 檢查代號格式
+            const invalidSymbols = symbolList.filter(symbol => {
+                return !/^[A-Z0-9]+(\.[A-Z]{1,3})?$/.test(symbol);
+            });
+            
+            if (invalidSymbols.length > 0) {
+                validationStatus.innerHTML = `<span class="badge bg-danger">❌ 無效代號: ${invalidSymbols.slice(0, 3).join(', ')}${invalidSymbols.length > 3 ? '...' : ''}</span>`;
+                return;
+            }
+            
+            validationStatus.innerHTML = `<span class="badge bg-success">✅ 已識別 ${symbolList.length} 個股票代號</span>`;
+        }
+
+        // 驗證日期範圍
+        function validateDateRange() {
+            const startDate = new Date(elements.startDateInput.value);
+            const endDate = new Date(elements.endDateInput.value);
+            const interval = elements.intervalSelect.value;
+            const today = new Date();
+            
+            if (!elements.startDateInput.value || !elements.endDateInput.value) return;
+            
+            // 檢查日期邏輯
+            if (startDate > endDate) {
+                showError(['開始日期不能晚於結束日期']);
+                return false;
+            }
+            
+            if (endDate > today) {
+                showError(['結束日期不能是未來日期']);
+                return false;
+            }
+            
+            // 檢查 yfinance 限制
+            const daysDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+            
+            const limits = {
+                '1m': 7,
+                '2m': 60, '5m': 60, '15m': 60, '30m': 60, '60m': 60,
+                '1h': 730
+            };
+            
+            if (limits[interval] && daysDiff > limits[interval]) {
+                showError([`${interval} 間隔最多只能下載 ${limits[interval]} 天的數據，您選擇了 ${daysDiff} 天`]);
+                return false;
+            }
+            
+            hideAlerts();
+            return true;
+        }
+
+        // 重新整理數據
+        function refreshData() {
+            // 重新檢測系統主題
+            if (localStorage.getItem('theme') === 'auto') {
+                detectSystemTheme();
+            }
+            
+            // 重新驗證表單
+            validateStockSymbols();
+            validateDateRange();
+            
+            showSuccess('數據已重新整理');
+            setTimeout(() => hideAlerts(), 2000);
+        }
+
+        // 檢測系統主題
+        function detectSystemTheme() {
+            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                document.documentElement.setAttribute('data-bs-theme', 'dark');
+            } else {
+                document.documentElement.setAttribute('data-bs-theme', 'light');
+            }
+        }
+
+        // 主題管理
+        function setTheme(theme) {
+            if (theme === 'auto') {
+                // 跟隨系統主題
+                detectSystemTheme();
+                // 監聽系統主題變化
+                if (window.matchMedia) {
+                    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', detectSystemTheme);
+                }
+            } else {
+                document.documentElement.setAttribute('data-bs-theme', theme);
+            }
+            
+            localStorage.setItem('theme', theme);
+            updateThemeButton(theme);
+        }
+
+        function updateThemeButton(theme) {
+            const themeButton = document.querySelector('.theme-toggle');
+            const themeTexts = {
+                'auto': '🌓 主題',
+                'light': '☀️ 主題', 
+                'dark': '🌙 主題'
+            };
+            themeButton.textContent = themeTexts[theme] || '🌓 主題';
+        }
+
+        function loadTheme() {
+            const savedTheme = localStorage.getItem('theme') || 'auto';
+            setTheme(savedTheme);
+        }
+
+        // 顯示錯誤
+        function showError(messages) {
+            elements.errorList.innerHTML = '';
+            messages.forEach(msg => {
+                const li = document.createElement('li');
+                li.textContent = msg;
+                elements.errorList.appendChild(li);
+            });
+            elements.errorAlert.classList.remove('d-none');
+            elements.successAlert.classList.add('d-none');
+        }
+
+        // 顯示成功
+        function showSuccess(message) {
+            elements.successMessage.textContent = message;
+            elements.successAlert.classList.remove('d-none');
+            elements.errorAlert.classList.add('d-none');
+        }
+
+        // 隱藏提示
+        function hideAlerts() {
+            elements.errorAlert.classList.add('d-none');
+            elements.successAlert.classList.add('d-none');
+        }
+
+        // 添加日誌
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `<span style="color: #888;">[${timestamp}]</span> ${message}`;
+            
+            if (type === 'error') {
+                logEntry.style.color = '#ff6b6b';
+            } else if (type === 'success') {
+                logEntry.style.color = '#51cf66';
+            } else if (type === 'warning') {
+                logEntry.style.color = '#ffd43b';
+            }
+            
+            elements.logContent.appendChild(logEntry);
+            elements.logContainer.scrollTop = elements.logContainer.scrollHeight;
+            elements.logCard.classList.remove('d-none');
+        }
+
+        // 清空日誌
+        function clearLog() {
+            elements.logContent.innerHTML = '';
+            elements.logCard.classList.add('d-none');
+        }
+
+        // 更新進度
+        function updateProgress(current, total, message = '') {
+            const percent = total > 0 ? Math.round((current / total) * 100) : 0;
+            elements.progressBar.style.width = `${percent}%`;
+            elements.progressPercent.textContent = `${percent}%`;
+            elements.progressText.textContent = message || `${current}/${total}`;
+            elements.progressCard.classList.remove('d-none');
+        }
+
+        // 驗證表單
+        function validateForm() {
+            const errors = [];
+            
+            const symbols = elements.symbolsInput.value.trim();
+            if (!symbols) {
+                errors.push('請輸入至少一個股票代號');
+            }
+            
+            // 使用已有的日期範圍驗證
+            if (!validateDateRange()) {
+                // 錯誤已在 validateDateRange 中顯示
+                return ['日期範圍驗證失敗'];
+            }
+            
+            // 驗證股票代號格式
+            const symbolList = symbols.split(/[,\n\r]+/).map(s => s.trim().toUpperCase()).filter(s => s.length > 0);
+            const invalidSymbols = symbolList.filter(symbol => {
+                return !/^[A-Z0-9]+(\.[A-Z]{1,3})?$/.test(symbol);
+            });
+            
+            if (invalidSymbols.length > 0) {
+                errors.push(`無效的股票代號: ${invalidSymbols.slice(0, 5).join(', ')}${invalidSymbols.length > 5 ? '...' : ''}`);
+            }
+            
+            return errors;
+        }
+
+        // 解析股票代號
+        function parseSymbols(symbolsText, marketSuffix) {
+            const symbols = symbolsText
+                .split(/[,\n\r]+/)
+                .map(s => s.trim().toUpperCase())
+                .filter(s => s.length > 0);
+            
+            return symbols.map(symbol => {
+                // 如果已經有後綴，就不添加
+                const hasSuffix = ['.TW', '.HK', '.T', '.DE', '.L'].some(suffix => symbol.endsWith(suffix));
+                if (marketSuffix && !hasSuffix) {
+                    return symbol + marketSuffix;
+                }
+                return symbol;
+            });
+        }
+
+        // 模擬下載數據 (實際應用中這裡會調用真實的API)
+        async function downloadStockData(symbol, startDate, endDate, interval) {
+            // 模擬網絡延遲
+            await new Promise(resolve => setTimeout(resolve, Math.random() * 2000 + 1000));
+            
+            // 模擬成功率約90%
+            const success = Math.random() > 0.1;
+            
+            if (success) {
+                const records = Math.floor(Math.random() * 500) + 100;
+                return {
+                    success: true,
+                    records: records,
+                    message: `成功下載 ${records} 筆記錄`,
+                    data: generateMockData(symbol, records)
+                };
+            } else {
+                return {
+                    success: false,
+                    records: 0,
+                    message: '網絡錯誤或股票代號不存在',
+                    data: null
+                };
+            }
+        }
+
+        // 生成模擬數據
+        function generateMockData(symbol, count) {
+            const data = [];
+            const basePrice = Math.random() * 100 + 50;
+            let currentPrice = basePrice;
+            
+            for (let i = 0; i < count; i++) {
+                const change = (Math.random() - 0.5) * 5;
+                currentPrice = Math.max(currentPrice + change, 1);
+                
+                data.push({
+                    Date: new Date(Date.now() - (count - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                    Open: currentPrice.toFixed(2),
+                    High: (currentPrice * (1 + Math.random() * 0.05)).toFixed(2),
+                    Low: (currentPrice * (1 - Math.random() * 0.05)).toFixed(2),
+                    Close: currentPrice.toFixed(2),
+                    Volume: Math.floor(Math.random() * 1000000)
+                });
+            }
+            
+            return data;
+        }
+
+        // 處理下載
+        async function handleDownload(event) {
+            event.preventDefault();
+            
+            if (isDownloading) return;
+            
+            hideAlerts();
+            const errors = validateForm();
+            if (errors.length > 0) {
+                showError(errors);
+                return;
+            }
+            
+            // 保存當前設置
+            saveSettings();
+            
+            isDownloading = true;
+            downloadResults = [];
+            
+            // 更新UI狀態
+            elements.downloadBtn.disabled = true;
+            elements.loadingSpinner.classList.remove('d-none');
+            elements.stopBtn.style.display = 'inline-block';
+            elements.retryBtn.style.display = 'none';
+            elements.resultsCard.classList.add('d-none');
+            
+            // 重置結果追蹤
+            downloadResults = [];
+            
+            // 獲取表單數據
+            const formData = new FormData(elements.form);
+            const selectedOption = elements.marketSelect.selectedOptions[0];
+            const marketSuffix = selectedOption.dataset.suffix;
+            
+            const symbols = parseSymbols(formData.get('symbols'), marketSuffix);
+            const startDate = formData.get('start_date');
+            const endDate = formData.get('end_date');
+            const interval = formData.get('interval');
+            const outputFormat = formData.get('output_format');
+            
+            addLog(`開始下載 ${symbols.length} 隻股票的數據`, 'info');
+            addLog(`時間範圍: ${startDate} 至 ${endDate}`, 'info');
+            addLog(`時間間隔: ${interval}, 輸出格式: ${outputFormat}`, 'info');
+            
+            let completed = 0;
+            let totalRecords = 0;
+            
+            // 逐個下載股票數據
+            for (const symbol of symbols) {
+                if (!isDownloading) break;
+                
+                updateProgress(completed, symbols.length, `正在下載 ${symbol}...`);
+                addLog(`開始下載 ${symbol}`, 'info');
+                
+                try {
+                    const result = await downloadStockData(symbol, startDate, endDate, interval);
+                    result.symbol = symbol;
+                    result.outputFormat = outputFormat;
+                    downloadResults.push(result);
+                    
+                    if (result.success) {
+                        totalRecords += result.records;
+                        addLog(`✅ ${symbol}: ${result.message}`, 'success');
+                    } else {
+                        addLog(`❌ ${symbol}: ${result.message}`, 'error');
+                    }
+                } catch (error) {
+                    const result = {
+                        symbol: symbol,
+                        success: false,
+                        records: 0,
+                        message: `下載失敗: ${error.message}`,
+                        data: null,
+                        outputFormat: outputFormat
+                    };
+                    downloadResults.push(result);
+                    addLog(`❌ ${symbol}: ${result.message}`, 'error');
+                }
+                
+                completed++;
+                updateProgress(completed, symbols.length);
+            }
+            
+            // 完成下載
+            isDownloading = false;
+            elements.downloadBtn.disabled = false;
+            elements.loadingSpinner.classList.add('d-none');
+            elements.stopBtn.style.display = 'none';
+            
+            if (completed > 0) {
+                const successCount = downloadResults.filter(r => r.success).length;
+                const failedCount = downloadResults.length - successCount;
+                
+                addLog(`下載完成! 成功: ${successCount}, 失敗: ${failedCount}, 總記錄數: ${totalRecords}`, 'success');
+                
+                // 顯示詳細結果摘要
+                let resultMsg = `下載完成!\n成功: ${successCount} 隻\n失敗: ${failedCount} 隻\n總記錄數: ${totalRecords.toLocaleString()}`;
+                
+                if (failedCount > 0) {
+                    resultMsg += '\n\n失敗的股票:\n';
+                    const failedResults = downloadResults.filter(r => !r.success);
+                    failedResults.slice(0, 5).forEach(result => {
+                        resultMsg += `• ${result.symbol}: ${result.message.substring(0, 50)}...\n`;
+                    });
+                    if (failedResults.length > 5) {
+                        resultMsg += `... 還有 ${failedResults.length - 5} 個失敗項目\n`;
+                    }
+                    
+                    elements.retryBtn.style.display = 'inline-block';
+                }
+                
+                showSuccess(resultMsg);
+                displayResults();
+            } else {
+                addLog('下載被中止', 'warning');
+                
+                // 如果有失敗項目，啟用重試按鈕
+                const failedCount = downloadResults.filter(r => !r.success).length;
+                if (failedCount > 0) {
+                    elements.retryBtn.style.display = 'inline-block';
+                }
+            }
+        }
+
+        // 停止下載
+        function stopDownload() {
+            if (isDownloading) {
+                isDownloading = false;
+                addLog('用戶停止下載', 'warning');
+            }
+        }
+
+        // 顯示結果
+        function displayResults() {
+            if (downloadResults.length === 0) return;
+            
+            const successCount = downloadResults.filter(r => r.success).length;
+            const failedCount = downloadResults.length - successCount;
+            const totalRecords = downloadResults.reduce((sum, r) => sum + r.records, 0);
+            
+            elements.successCount.textContent = successCount;
+            elements.failedCount.textContent = failedCount;
+            elements.totalCount.textContent = downloadResults.length;
+            elements.totalRecords.textContent = totalRecords.toLocaleString();
+            
+            // 清空並重新填充結果表格
+            elements.resultsTbody.innerHTML = '';
+            
+            downloadResults.forEach((result, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><strong>${result.symbol}</strong></td>
+                    <td>
+                        <span class="badge ${result.success ? 'text-bg-success' : 'text-bg-danger'}">
+                            ${result.success ? '成功' : '失敗'}
+                        </span>
+                    </td>
+                    <td>${result.records.toLocaleString()}</td>
+                    <td>${result.message}</td>
+                    <td>
+                        ${result.success ? 
+                            `<button class="btn btn-sm btn-outline-primary" onclick="downloadSingle(${index})">💾 下載</button>` :
+                            `<button class="btn btn-sm btn-outline-warning" onclick="retrySingle(${index})">🔄 重試</button>`
+                        }
+                    </td>
+                `;
+                elements.resultsTbody.appendChild(row);
+            });
+            
+            elements.resultsCard.classList.remove('d-none');
+        }
+
+        // 下載單個結果
+        function downloadSingle(index) {
+            const result = downloadResults[index];
+            if (!result.success || !result.data) return;
+            
+            const filename = `${result.symbol}_${result.outputFormat.toLowerCase()}_data`;
+            downloadData(result.data, filename, result.outputFormat);
+        }
+
+        // 重試單個下載
+        async function retrySingle(index) {
+            const result = downloadResults[index];
+            addLog(`重試下載 ${result.symbol}`, 'info');
+            
+            try {
+                const formData = new FormData(elements.form);
+                const newResult = await downloadStockData(
+                    result.symbol,
+                    formData.get('start_date'),
+                    formData.get('end_date'),
+                    formData.get('interval')
+                );
+                
+                newResult.symbol = result.symbol;
+                newResult.outputFormat = result.outputFormat;
+                downloadResults[index] = newResult;
+                
+                if (newResult.success) {
+                    addLog(`✅ ${result.symbol}: 重試成功`, 'success');
+                } else {
+                    addLog(`❌ ${result.symbol}: 重試失敗`, 'error');
+                }
+                
+                displayResults();
+            } catch (error) {
+                addLog(`❌ ${result.symbol}: 重試失敗 - ${error.message}`, 'error');
+            }
+        }
+
+        // 下載全部成功的結果
+        function downloadAllResults() {
+            const successResults = downloadResults.filter(r => r.success);
+            if (successResults.length === 0) {
+                showError(['沒有成功的下載結果']);
+                return;
+            }
+            
+            // 創建ZIP文件 (這裡簡化處理，實際應用中需要使用JSZip等庫)
+            successResults.forEach(result => {
+                const filename = `${result.symbol}_data`;
+                downloadData(result.data, filename, result.outputFormat);
+            });
+            
+            showSuccess(`已開始下載 ${successResults.length} 個文件`);
+        }
+
+        // 重試失敗的下載
+        async function retryFailedDownloads() {
+            const failedResults = downloadResults.filter(r => !r.success);
+            if (failedResults.length === 0) {
+                showError(['沒有失敗的下載項目']);
+                return;
+            }
+            
+            addLog(`開始重試 ${failedResults.length} 個失敗項目`, 'info');
+            
+            for (const result of failedResults) {
+                const index = downloadResults.indexOf(result);
+                await retrySingle(index);
+            }
+        }
+
+        // 下載數據文件
+        function downloadData(data, filename, format) {
+            let content, mimeType, extension;
+            
+            switch (format) {
+                case 'CSV':
+                    content = convertToCSV(data);
+                    mimeType = 'text/csv';
+                    extension = 'csv';
+                    break;
+                case 'JSON':
+                    content = JSON.stringify(data, null, 2);
+                    mimeType = 'application/json';
+                    extension = 'json';
+                    break;
+                case 'Excel':
+                    // 簡化處理，實際應用中需要使用SheetJS等庫
+                    content = convertToCSV(data);
+                    mimeType = 'text/csv';
+                    extension = 'csv';
+                    break;
+                default:
+                    content = JSON.stringify(data, null, 2);
+                    mimeType = 'application/json';
+                    extension = 'json';
+            }
+            
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${filename}.${extension}`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // 轉換為CSV格式
+        function convertToCSV(data) {
+            if (!data || data.length === 0) return '';
+            
+            const headers = Object.keys(data[0]);
+            const csvContent = [
+                headers.join(','),
+                ...data.map(row => headers.map(header => `"${row[header]}"`).join(','))
+            ].join('\n');
+            
+            return csvContent;
+        }
+
+        // 清空表單
+        function clearForm() {
+            elements.symbolsInput.value = '';
+            elements.marketSelect.selectedIndex = 0;
+            elements.intervalSelect.value = '1d';
+            document.querySelector('input[name="output_format"][value="CSV"]').checked = true;
+            initializeDates();
+            updateMarketExample();
+            updateIntervalWarning();
+            
+            // 重置進度和狀態
+            elements.progressBar.style.width = '0%';
+            elements.progressPercent.textContent = '0%';
+            elements.progressText.textContent = '準備就緒';
+            
+            // 隱藏結果和進度
+            elements.progressCard.classList.add('d-none');
+            elements.resultsCard.classList.add('d-none');
+            elements.stopBtn.style.display = 'none';
+            elements.retryBtn.style.display = 'none';
+            hideAlerts();
+            clearLog();
+            
+            // 重置驗證狀態
+            document.getElementById('validation-status').innerHTML = '<span class="badge bg-success">✅ 準備輸入股票代號</span>';
+            
+            downloadResults = [];
+            
+            addLog('表單已清空', 'info');
+        }
+
+        // 全局函數供HTML調用
+        window.downloadSingle = downloadSingle;
+        window.retrySingle = retrySingle;
+        window.setTheme = setTheme;
+    </script>
+</body>
+</html>
