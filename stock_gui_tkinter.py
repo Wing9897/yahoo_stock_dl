@@ -56,6 +56,12 @@ class StockDataGUI:
                                      state="readonly")
         interval_combo.grid(row=4, column=1, sticky=(tk.W, tk.E), pady=5)
 
+        # 時間間隔限制提示
+        interval_hint = ttk.Label(main_frame,
+                                 text="⚠️ 限制: 1m(7天), 2m-30m(59天/60天內), 60m/1h(729天), 1d+(無限)",
+                                 foreground="#FF6600", font=("Arial", 8))
+        interval_hint.grid(row=4, column=2, sticky=tk.W, padx=(10, 0))
+
         # 日期範圍
         date_frame = ttk.LabelFrame(main_frame, text="日期範圍", padding="5")
         date_frame.grid(row=5, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=10)
@@ -171,9 +177,43 @@ class StockDataGUI:
         try:
             start_date = datetime.strptime(self.start_date.get(), "%Y-%m-%d")
             end_date = datetime.strptime(self.end_date.get(), "%Y-%m-%d")
+            today = datetime.now()
+
             if start_date >= end_date:
                 messagebox.showerror("錯誤", "開始日期必須早於結束日期")
                 return
+
+            if end_date > today:
+                messagebox.showerror("錯誤", f"結束日期不能是未來日期！今天是 {today.strftime('%Y-%m-%d')}")
+                return
+
+            # 檢查時間間隔限制
+            interval = self.interval_var.get()
+            days_diff = (end_date - start_date).days
+            days_from_today = (today - start_date).days
+
+            if interval == "1m" and (days_diff > 7 or days_from_today > 30):
+                result = messagebox.askquestion("日期範圍警告",
+                                               "1分鐘數據：範圍最多7天，須在最近30天內\n\n是否繼續下載？",
+                                               icon='warning')
+                if result != 'yes':
+                    return
+
+            elif interval in ["2m", "5m", "15m", "30m"]:
+                if days_diff > 59:
+                    messagebox.showerror("錯誤",
+                                        f"{interval}數據的日期範圍不能超過59天（Yahoo Finance限制）\n當前選擇了{days_diff}天")
+                    return
+                if days_from_today > 60:
+                    messagebox.showerror("錯誤",
+                                        f"{interval}數據只能獲取最近60天內的數據\n開始日期距今{days_from_today}天")
+                    return
+
+            elif interval in ["60m", "1h"] and days_diff > 729:
+                messagebox.showerror("錯誤",
+                                    f"小時數據的日期範圍不能超過729天（Yahoo Finance限制）\n當前選擇了{days_diff}天")
+                return
+
         except ValueError:
             messagebox.showerror("錯誤", "日期格式不正確，請使用 YYYY-MM-DD 格式")
             return
@@ -273,21 +313,29 @@ class StockDataGUI:
     def save_data(self, symbol, data, db_connection=None):
         output_format = self.output_format.get()
         output_dir = self.output_dir.get()
+        interval = self.interval_var.get()
 
         # 清理檔案名稱中的特殊字符
         safe_symbol = symbol.replace('.', '_').replace(':', '_')
 
+        # 添加Symbol欄位並統一時間格式
+        data_copy = data.copy()
+        data_copy.insert(0, 'Symbol', symbol)  # 在第一列插入Symbol
+
+        # 統一使用完整日期時間格式 YYYY-MM-DD HH:MM:SS（所有時間間隔）
+        data_copy.index = data_copy.index.strftime('%Y-%m-%d %H:%M:%S')
+
         if output_format == "CSV":
             filename = os.path.join(output_dir, f"{safe_symbol}_data.csv")
-            data.to_csv(filename)
+            data_copy.to_csv(filename, index_label='Date')
 
         elif output_format == "Excel":
             filename = os.path.join(output_dir, f"{safe_symbol}_data.xlsx")
-            data.to_excel(filename)
+            data_copy.to_excel(filename, index_label='Date')
 
         elif output_format == "SQLite" and db_connection:
             table_name = f"stock_{safe_symbol}"
-            data.to_sql(table_name, db_connection, if_exists='replace', index=True)
+            data_copy.to_sql(table_name, db_connection, if_exists='replace', index_label='Date')
 
 def main():
     root = tk.Tk()

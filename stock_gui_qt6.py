@@ -125,17 +125,24 @@ class DownloadWorker(QThread):
         # 清理檔案名稱中的特殊字符
         safe_symbol = symbol.replace('.', '_').replace(':', '_')
 
+        # 添加Symbol欄位並統一時間格式
+        data_copy = data.copy()
+        data_copy.insert(0, 'Symbol', symbol)  # 在第一列插入Symbol
+
+        # 統一使用完整日期時間格式 YYYY-MM-DD HH:MM:SS（所有時間間隔）
+        data_copy.index = data_copy.index.strftime('%Y-%m-%d %H:%M:%S')
+
         if self.output_format == "CSV":
             filename = os.path.join(self.output_dir, f"{safe_symbol}_data.csv")
-            data.to_csv(filename)
+            data_copy.to_csv(filename, index_label='Date')
 
         elif self.output_format == "Excel":
             filename = os.path.join(self.output_dir, f"{safe_symbol}_data.xlsx")
-            data.to_excel(filename)
+            data_copy.to_excel(filename, index_label='Date')
 
         elif self.output_format == "SQLite" and db_connection:
             table_name = f"stock_{safe_symbol}"
-            data.to_sql(table_name, db_connection, if_exists='replace', index=True)
+            data_copy.to_sql(table_name, db_connection, if_exists='replace', index_label='Date')
 
 
 class EnhancedStockGUI(QMainWindow):
@@ -359,7 +366,7 @@ class EnhancedStockGUI(QMainWindow):
         settings_area.addWidget(self.market_example)
 
         # yfinance限制警告
-        self.interval_warning = QLabel("💡 提醒: 1分鐘數據僅限7天，分鐘級數據僅限60天，小時數據僅限730天")
+        self.interval_warning = QLabel("💡 提醒: 1分鐘數據最多7天，2-30分鐘數據最多59天且須在60天內，小時數據最多729天")
         self.interval_warning.setStyleSheet("color: #FF9800; font-size: 10px; padding: 2px; font-weight: bold;")
         self.interval_warning.setWordWrap(True)
         settings_area.addWidget(self.interval_warning)
@@ -488,11 +495,11 @@ class EnhancedStockGUI(QMainWindow):
         yf_limits_layout = QVBoxLayout(yf_limits_group)
 
         limits_text = QLabel(
-            "📊 時間間隔限制：\n"
-            "• 1分鐘數據(1m)：僅限最近7天\n"
-            "• 分鐘級數據(2m~30m)：僅限最近60天\n"
-            "• 小時數據(1h)：僅限最近730天(約2年)\n"
-            "• 日線及以上：可獲取長期歷史數據\n\n"
+            "📊 時間間隔限制（Yahoo Finance實際限制）：\n"
+            "• 1分鐘數據(1m)：範圍最多7天，須在最近30天內\n"
+            "• 分鐘級數據(2m~30m)：範圍最多59天，須在最近60天內\n"
+            "• 小時數據(60m/1h)：範圍最多729天(約2年)\n"
+            "• 日線及以上(1d/1wk/1mo)：可獲取長期歷史數據\n\n"
             "⚠️ 重要提醒：\n"
             "• 數據成功率約98%（偶有失敗）\n"
             "• 僅限個人研究和教育用途\n"
@@ -952,13 +959,13 @@ class EnhancedStockGUI(QMainWindow):
     def update_interval_warning(self, interval):
         """根據選中的時間間隔更新警告信息"""
         warnings = {
-            "1m": "⚠️ 1分鐘數據：僅限最近7天",
-            "2m": "⚠️ 2分鐘數據：僅限最近60天",
-            "5m": "⚠️ 5分鐘數據：僅限最近60天",
-            "15m": "⚠️ 15分鐘數據：僅限最近60天",
-            "30m": "⚠️ 30分鐘數據：僅限最近60天",
-            "60m": "⚠️ 1小時數據：僅限最近730天(約2年)",
-            "1h": "⚠️ 1小時數據：僅限最近730天(約2年)",
+            "1m": "⚠️ 1分鐘數據：範圍最多7天，須在最近30天內",
+            "2m": "⚠️ 2分鐘數據：範圍最多59天，須在最近60天內",
+            "5m": "⚠️ 5分鐘數據：範圍最多59天，須在最近60天內",
+            "15m": "⚠️ 15分鐘數據：範圍最多59天，須在最近60天內",
+            "30m": "⚠️ 30分鐘數據：範圍最多59天，須在最近60天內",
+            "60m": "⚠️ 60分鐘數據：範圍最多729天(約2年)",
+            "1h": "⚠️ 1小時數據：範圍最多729天(約2年)",
             "1d": "✅ 日線數據：可獲取長期歷史數據",
             "1wk": "✅ 週線數據：可獲取長期歷史數據",
             "1mo": "✅ 月線數據：可獲取長期歷史數據"
@@ -982,26 +989,28 @@ class EnhancedStockGUI(QMainWindow):
 
         today = datetime.now().date()
         days_diff = (end_date - start_date).days
-        days_from_today = (today - end_date).days
+        days_from_today = (today - start_date).days  # 檢查開始日期距今天數
 
         # 檢查不同間隔的限制
         if interval == "1m":
             if days_diff > 7:
                 return False, "1分鐘數據的日期範圍不能超過7天"
-            if days_from_today > 7:
-                return False, "1分鐘數據只能獲取最近7天的數據"
+            if days_from_today > 30:
+                return False, "1分鐘數據只能獲取最近30天內的數據"
 
         elif interval in ["2m", "5m", "15m", "30m"]:
-            if days_diff > 60:
-                return False, f"{interval}數據的日期範圍不能超過60天"
+            # Yahoo Finance實際限制：範圍最多59天，且必須在最近60天內
+            if days_diff > 59:
+                return False, f"{interval}數據的日期範圍不能超過59天（Yahoo Finance限制）"
             if days_from_today > 60:
-                return False, f"{interval}數據只能獲取最近60天的數據"
+                return False, f"{interval}數據只能獲取最近60天內的數據，開始日期距今{days_from_today}天"
 
         elif interval in ["60m", "1h"]:
-            if days_diff > 730:
-                return False, f"1小時數據的日期範圍不能超過730天(約2年)"
+            # 使用729天以確保安全
+            if days_diff > 729:
+                return False, f"小時數據的日期範圍不能超過729天（Yahoo Finance限制）"
             if days_from_today > 730:
-                return False, f"1小時數據只能獲取最近730天(約2年)的數據"
+                return False, f"小時數據只能獲取最近730天內的數據"
 
         return True, ""
 

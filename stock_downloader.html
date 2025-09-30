@@ -293,7 +293,7 @@
                                                     範例：AAPL, MSFT, GOOGL
                                                 </div>
                                                 <div class="alert alert-warning mt-2 p-2" id="interval-warning">
-                                                    💡 提醒: 1分鐘數據僅限7天，分鐘級數據僅限60天，小時數據僅限730天
+                                                    💡 提醒: 1分鐘數據僅限7天，2-30分鐘數據僅限60天，60分鐘/1小時數據僅限730天
                                                 </div>
                                             </div>
                                         </div>
@@ -429,8 +429,8 @@
                                                 <ul class="list-unstyled">
                                                     <li>• 1分鐘數據(1m)：僅限最近7天</li>
                                                     <li>• 分鐘級數據(2m~30m)：僅限最近60天</li>
-                                                    <li>• 小時數據(1h)：僅限最近730天(約2年)</li>
-                                                    <li>• 日線及以上：可獲取長期歷史數據</li>
+                                                    <li>• 小時數據(60m/1h)：僅限最近730天(約2年)</li>
+                                                    <li>• 日線及以上(1d/1wk/1mo)：可獲取長期歷史數據</li>
                                                 </ul>
                                             </div>
                                             <div class="col-md-6">
@@ -741,11 +741,11 @@
             
             const warnings = {
                 '1m': '⚠️ 1分鐘數據：僅限最近7天',
-                '2m': '⚠️ 2分鐘數據：僅限最近60天',
-                '5m': '⚠️ 5分鐘數據：僅限最近60天',
-                '15m': '⚠️ 15分鐘數據：僅限最近60天',
-                '30m': '⚠️ 30分鐘數據：僅限最近60天',
-                '60m': '⚠️ 60分鐘數據：僅限最近60天',
+                '2m': '⚠️ 2分鐘數據：範圍最多59天，且須在最近60天內',
+                '5m': '⚠️ 5分鐘數據：範圍最多59天，且須在最近60天內',
+                '15m': '⚠️ 15分鐘數據：範圍最多59天，且須在最近60天內',
+                '30m': '⚠️ 30分鐘數據：範圍最多59天，且須在最近60天內',
+                '60m': '⚠️ 60分鐘數據：僅限最近730天(約2年)',
                 '1h': '⚠️ 1小時數據：僅限最近730天(約2年)',
                 '1d': '💡 日線數據：可獲取長期歷史數據',
                 '1wk': '💡 週線數據：可獲取長期歷史數據',
@@ -776,30 +776,51 @@
         function validateStockSymbols() {
             const symbols = elements.symbolsInput.value.trim();
             const validationStatus = document.getElementById('validation-status');
-            
+
             if (!symbols) {
                 validationStatus.innerHTML = '<span class="badge bg-secondary">✅ 準備輸入股票代號</span>';
                 return;
             }
-            
+
             const symbolList = symbols.split(/[,\n\r]+/).map(s => s.trim().toUpperCase()).filter(s => s.length > 0);
-            
+
             if (symbolList.length === 0) {
                 validationStatus.innerHTML = '<span class="badge bg-warning">⚠️ 請輸入有效的股票代號</span>';
                 return;
             }
-            
+
             // 檢查代號格式
             const invalidSymbols = symbolList.filter(symbol => {
                 return !/^[A-Z0-9]+(\.[A-Z]{1,3})?$/.test(symbol);
             });
-            
+
             if (invalidSymbols.length > 0) {
                 validationStatus.innerHTML = `<span class="badge bg-danger">❌ 無效代號: ${invalidSymbols.slice(0, 3).join(', ')}${invalidSymbols.length > 3 ? '...' : ''}</span>`;
                 return;
             }
-            
-            validationStatus.innerHTML = `<span class="badge bg-success">✅ 已識別 ${symbolList.length} 個股票代號</span>`;
+
+            // 檢查常見錯誤代號並給予提示
+            const commonMistakes = {
+                'APPL': 'AAPL (蘋果)',
+                'GOOGL': 'GOOGL ✓ 或 GOOG',
+                'AMZN': 'AMZN ✓',
+                'MSFT': 'MSFT ✓',
+                'TSLA': 'TSLA ✓'
+            };
+
+            const suggestions = [];
+            symbolList.forEach(symbol => {
+                if (symbol === 'APPL') {
+                    suggestions.push('⚠️ 您輸入的是 APPL，是否要輸入 AAPL (蘋果公司)?');
+                }
+            });
+
+            let statusHTML = `<span class="badge bg-success">✅ 已識別 ${symbolList.length} 個股票代號</span>`;
+            if (suggestions.length > 0) {
+                statusHTML += `<br><span class="badge bg-warning mt-1">${suggestions[0]}</span>`;
+            }
+
+            validationStatus.innerHTML = statusHTML;
         }
 
         // 驗證日期範圍
@@ -817,23 +838,43 @@
                 return false;
             }
             
-            if (endDate > today) {
-                showError(['結束日期不能是未來日期']);
+            // 設置今天日期為今天的結束（23:59:59）
+            const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
+
+            if (endDate > todayEnd) {
+                const todayStr = today.toISOString().split('T')[0];
+                showError([`結束日期不能是未來日期！今天是 ${todayStr}`]);
+                return false;
+            }
+
+            if (startDate > todayEnd) {
+                const todayStr = today.toISOString().split('T')[0];
+                showError([`開始日期不能是未來日期！今天是 ${todayStr}`]);
                 return false;
             }
             
-            // 檢查 yfinance 限制
+            // 檢查 yfinance 限制（使用更保守的策略）
             const daysDiff = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
-            
+
             const limits = {
                 '1m': 7,
-                '2m': 60, '5m': 60, '15m': 60, '30m': 60, '60m': 60,
-                '1h': 730
+                '2m': 59, '5m': 59, '15m': 59, '30m': 59,  // 實際限制可能是59天，不是60天
+                '60m': 729, '1h': 729  // 使用729天而不是730天以確保安全
             };
-            
+
             if (limits[interval] && daysDiff > limits[interval]) {
                 showError([`${interval} 間隔最多只能下載 ${limits[interval]} 天的數據，您選擇了 ${daysDiff} 天`]);
                 return false;
+            }
+
+            // 額外檢查：對於分鐘級數據，還要檢查距離今天的天數
+            if (['2m', '5m', '15m', '30m'].includes(interval)) {
+                const today = new Date();
+                const daysFromToday = Math.ceil((today - startDate) / (1000 * 60 * 60 * 24));
+                if (daysFromToday > 60) {
+                    showError([`${interval} 間隔只能獲取最近60天內的數據，您的開始日期距今 ${daysFromToday} 天`]);
+                    return false;
+                }
             }
             
             hideAlerts();
@@ -1059,13 +1100,13 @@
             const period1 = Math.floor(new Date(startDate).getTime() / 1000);
             const period2 = Math.floor(new Date(endDate).getTime() / 1000);
 
-            // 使用 corsproxy.io CORS代理服務
-            const apiUrl = `https://corsproxy.io/?${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?period1=${period1}&period2=${period2}&interval=${interval}&includePrePost=false&events=div%2Csplit`)}`;
+            // 首先嘗試包含盤前盤後數據
+            let apiUrl = `https://corsproxy.io/?${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?period1=${period1}&period2=${period2}&interval=${interval}&includePrePost=true&events=div%2Csplit`)}`;
 
             try {
-                addLog(`📡 通過 corsproxy.io 獲取 ${symbol} 數據...`);
+                addLog(`📡 通過 corsproxy.io 獲取 ${symbol} 數據（包含盤前盤後）...`);
 
-                const response = await fetch(apiUrl, {
+                let response = await fetch(apiUrl, {
                     method: 'GET',
                     headers: {
                         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
@@ -1080,11 +1121,34 @@
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
 
-                const data = await response.json();
+                let data = await response.json();
                 addLog(`✅ 成功獲取 ${symbol} 數據`);
 
-                // 解析Yahoo Finance API響應
-                return parseYahooFinanceResponse(data, symbol);
+                // 嘗試解析數據
+                try {
+                    return parseYahooFinanceResponse(data, symbol, interval);
+                } catch (parseError) {
+                    // 如果包含盤前盤後數據失敗，嘗試只獲取正常交易時段數據
+                    addLog(`⚠️ 包含盤前盤後數據失敗，嘗試只獲取正常交易時段...`, 'warning');
+
+                    apiUrl = `https://corsproxy.io/?${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?period1=${period1}&period2=${period2}&interval=${interval}&includePrePost=false&events=div%2Csplit`)}`;
+
+                    response = await fetch(apiUrl, {
+                        method: 'GET',
+                        headers: {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                        }
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+
+                    data = await response.json();
+                    addLog(`✅ 成功獲取 ${symbol} 正常交易時段數據`);
+
+                    return parseYahooFinanceResponse(data, symbol, interval);
+                }
 
             } catch (error) {
                 addLog(`❌ corsproxy.io 請求失敗: ${error.message}`, 'error');
@@ -1099,18 +1163,47 @@
         }
 
         // 解析Yahoo Finance API響應數據
-        function parseYahooFinanceResponse(apiResponse, symbol) {
+        function parseYahooFinanceResponse(apiResponse, symbol, interval) {
             try {
-                if (!apiResponse.chart || !apiResponse.chart.result || apiResponse.chart.result.length === 0) {
-                    throw new Error('API響應中無有效數據');
+                // 詳細檢查API響應結構
+                if (!apiResponse.chart) {
+                    console.error('API響應缺少chart:', apiResponse);
+                    throw new Error('API響應格式錯誤：缺少chart節點');
+                }
+
+                if (apiResponse.chart.error) {
+                    const error = apiResponse.chart.error;
+                    console.error('Yahoo Finance API錯誤:', error);
+                    throw new Error(`Yahoo Finance錯誤: ${error.description || error.code}`);
+                }
+
+                if (!apiResponse.chart.result || apiResponse.chart.result.length === 0) {
+                    console.error('API響應result為空:', apiResponse.chart);
+                    throw new Error('API響應中無有效數據（可能股票代號錯誤或無交易數據）');
                 }
 
                 const result = apiResponse.chart.result[0];
+
+                // 檢查是否有indicators
+                if (!result.indicators || !result.indicators.quote || result.indicators.quote.length === 0) {
+                    console.error('缺少indicators.quote:', result);
+                    throw new Error('API響應缺少價格數據');
+                }
+
                 const quote = result.indicators.quote[0];
                 const timestamps = result.timestamp;
 
                 if (!timestamps || timestamps.length === 0) {
-                    throw new Error('無時間序列數據');
+                    console.error('timestamps為空:', result);
+                    // 檢查是否是日期範圍問題
+                    const meta = result.meta;
+                    if (meta) {
+                        addLog(`⚠️ 股票 ${symbol} 的元數據: 交易所=${meta.exchangeName}, 貨幣=${meta.currency}`, 'warning');
+                        if (meta.tradingPeriods && meta.tradingPeriods.length === 0) {
+                            throw new Error('選擇的日期範圍內無交易數據（可能是週末、假日或未來日期）');
+                        }
+                    }
+                    throw new Error('無時間序列數據（請檢查日期範圍是否正確）');
                 }
 
                 addLog(`📊 解析 ${symbol} 數據: ${timestamps.length} 個時間點`);
@@ -1125,8 +1218,12 @@
                         continue;
                     }
 
+                    // 統一使用完整日期時間格式 (YYYY-MM-DD HH:MM:SS)
+                    const dateStr = date.toISOString().replace('T', ' ').substring(0, 19);
+
                     stockData.push({
-                        Date: date.toISOString().split('T')[0],
+                        Symbol: symbol,
+                        Date: dateStr,
                         Open: quote.open[i] ? Number(quote.open[i].toFixed(2)) : Number(quote.close[i].toFixed(2)),
                         High: quote.high[i] ? Number(quote.high[i].toFixed(2)) : Number(quote.close[i].toFixed(2)),
                         Low: quote.low[i] ? Number(quote.low[i].toFixed(2)) : Number(quote.close[i].toFixed(2)),
@@ -1168,15 +1265,20 @@
                 case '5m':
                 case '15m':
                 case '30m':
-                    if (diffDays > 60) {
-                        return { valid: false, message: `${interval}數據最多只能下載60天範圍` };
+                    if (diffDays > 59) {
+                        return { valid: false, message: `${interval}數據最多只能下載59天範圍（Yahoo Finance限制）` };
+                    }
+                    // 額外檢查：必須在最近60天內
+                    const daysFromStart = Math.ceil((today - start) / (1000 * 60 * 60 * 24));
+                    if (daysFromStart > 60) {
+                        return { valid: false, message: `${interval}數據只能獲取最近60天內的數據，開始日期距今${daysFromStart}天` };
                     }
                     break;
 
                 case '60m':
                 case '1h':
-                    if (diffDays > 730) {
-                        return { valid: false, message: '1小時數據最多只能下載730天(約2年)範圍' };
+                    if (diffDays > 729) {
+                        return { valid: false, message: '小時數據最多只能下載729天範圍（Yahoo Finance限制）' };
                     }
                     break;
 
@@ -1524,8 +1626,8 @@
 
             // 創建工作表
             const worksheet = {};
-            const headers = ['日期', '開盤價', '最高價', '最低價', '收盤價', '成交量'];
-            const headerKeys = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume'];
+            const headers = ['股票代號', '日期', '開盤價', '最高價', '最低價', '收盤價', '成交量'];
+            const headerKeys = ['Symbol', 'Date', 'Open', 'High', 'Low', 'Close', 'Volume'];
 
             // 添加標題行
             headers.forEach((header, col) => {
@@ -1539,7 +1641,7 @@
                     const cellRef = String.fromCharCode(65 + col) + (rowIndex + 2);
                     const value = row[key];
 
-                    if (key === 'Date') {
+                    if (key === 'Symbol' || key === 'Date') {
                         worksheet[cellRef] = { v: value, t: 's' };
                     } else if (key === 'Volume') {
                         worksheet[cellRef] = { v: parseInt(value), t: 'n' };
@@ -1550,7 +1652,7 @@
             });
 
             // 設置工作表範圍
-            worksheet['!ref'] = `A1:F${data.length + 1}`;
+            worksheet['!ref'] = `A1:G${data.length + 1}`;
             workbook.Sheets['股票數據'] = worksheet;
 
             // 轉換為CSV格式（簡化版本）
@@ -1598,7 +1700,7 @@
                 // 批量插入數據
                 db.exec('BEGIN TRANSACTION');
                 data.forEach(row => {
-                    stmt.run([tableName, row.Date, row.Open, row.High, row.Low, row.Close, row.Volume]);
+                    stmt.run([row.Symbol || tableName, row.Date, row.Open, row.High, row.Low, row.Close, row.Volume]);
                 });
                 db.exec('COMMIT');
 
@@ -1634,7 +1736,8 @@
                         end: data[data.length - 1].Date
                     } : null,
                     columns: [
-                        { name: "Date", type: "string", description: "交易日期 (YYYY-MM-DD)" },
+                        { name: "Symbol", type: "string", description: "股票代號" },
+                        { name: "Date", type: "string", description: "交易日期時間" },
                         { name: "Open", type: "number", description: "開盤價" },
                         { name: "High", type: "number", description: "最高價" },
                         { name: "Low", type: "number", description: "最低價" },
@@ -1657,6 +1760,7 @@
                     }
                 } : null,
                 data: data.map(row => ({
+                    symbol: row.Symbol,
                     date: row.Date,
                     open: parseFloat(row.Open.toFixed(2)),
                     high: parseFloat(row.High.toFixed(2)),
